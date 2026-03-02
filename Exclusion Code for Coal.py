@@ -164,9 +164,20 @@ def merge_ur_into_sp_opt(sp_df, ur_df):
     ur = ur_df.copy().astype(object)
 
     # 🔹 Creating normalized versions of key identity columns from the SPGlobal dataset 🔹
-    sp["norm_isin"] = sp.get("SP_ISIN", "").astype(str).apply(normalize_key)
-    sp["norm_lei"] = sp.get("SP_LEI", "").astype(str).apply(normalize_key)
-    sp["norm_name"] = sp.get("SP_ENTITY_NAME", "").astype(str).apply(normalize_key)
+    if "SP_ISIN" not in sp.columns:
+        sp["SP_ISIN"] = ""   # create an empty column if it doesn’t exist
+        
+    sp["norm_isin"] = sp["SP_ISIN"].astype(str).apply(normalize_key)
+
+    if "SP_LEI" not in sp.columns:
+        sp["SP_LEI"] = ""
+    
+    sp["norm_lei"] = sp["SP_LEI"].astype(str).apply(normalize_key)
+
+    if "SP_ENTITY_NAME" not in sp.columns:
+        sp["SP_ENTITY_NAME"] = ""
+    
+    sp["norm_name"] = sp["SP_ENTITY_NAME"].astype(str).apply(normalize_key)
 
     # 🔹 Creating normalized versions of key identity columns from the Urgewald dataset and searches for identities in the raw 🔹
     for col in ["ISIN equity", "LEI", "Company"]:
@@ -494,5 +505,6 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
 

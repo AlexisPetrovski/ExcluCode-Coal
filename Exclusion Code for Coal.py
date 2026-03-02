@@ -204,9 +204,9 @@ def merge_ur_into_sp_opt(sp_df, ur_df):
             ur_not.append(r)
     # 🔹 This code finalizes the merge by clearly marking which rows were merged and which were not.🔹 
     if "Merged" not in sp.columns:
-    sp["Merged"] = False
-else:
-    sp["Merged"] = sp["Merged"].fillna(False)
+        sp["Merged"] = False
+    else:
+        sp["Merged"] = sp["Merged"].fillna(False)
     ur_only = pd.DataFrame(ur_not)
     ur_only["Merged"] = False
 
@@ -494,4 +494,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 

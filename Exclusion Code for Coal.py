@@ -24,7 +24,7 @@ def to_float(val):
         return 0.0
 
 
-# 🔹 Ensures that repeated column names like “Company”, “Company” are renamed to “Company”, “Company_1”. If it's the first appearance of the column → use the name as-is ("Company"). If it's a duplicate → add a numeric suffix, like "Company_1", "Company_2" 🔹
+# 🔹 Ensures that repeated column names like "Company", "Company" are renamed to "Company", "Company_1". If it's the first appearance of the column → use the name as-is ("Company"). If it's a duplicate → add a numeric suffix, like "Company_1", "Company_2" 🔹
 def make_columns_unique(df):
     seen, new_cols = {}, []
     for c in df.columns:
@@ -33,7 +33,7 @@ def make_columns_unique(df):
     df.columns = new_cols
     return df
 
-# 🔹 It renames columns in a table (a DataFrame) by looking for similar names, even if they’re not exactly the same. 🔹
+# 🔹 It renames columns in a table (a DataFrame) by looking for similar names, even if they're not exactly the same. 🔹
 def fuzzy_rename_columns(df, rename_map):
     used = set()
     for final_name, pats in rename_map.items():
@@ -119,7 +119,7 @@ def load_urgewald(file, sheet_name="GCEL 2024"):
         full_df = pd.DataFrame(data)
         if full_df.empty:
             raise ValueError("Urgewald file is empty.")
-# 🔹 Removes any "Parent Company" columns, cleans up the headers, fixes duplicate column names, and converts key numbers (like revenue %) into proper numeric values. It prepares the data so it’s ready to be used in filtering or analysis.🔹
+# 🔹 Removes any "Parent Company" columns, cleans up the headers, fixes duplicate column names, and converts key numbers (like revenue %) into proper numeric values. It prepares the data so it's ready to be used in filtering or analysis.🔹
         header = full_df.iloc[0].fillna("")
         keep = header.str.strip().str.lower() != "parent company"
         ur_df = full_df.iloc[1:].reset_index(drop=True).loc[:, keep]
@@ -165,7 +165,7 @@ def merge_ur_into_sp_opt(sp_df, ur_df):
 
     # 🔹 Creating normalized versions of key identity columns from the SPGlobal dataset 🔹
     if "SP_ISIN" not in sp.columns:
-        sp["SP_ISIN"] = ""   # create an empty column if it doesn’t exist
+        sp["SP_ISIN"] = ""   # create an empty column if it doesn't exist
         
     sp["norm_isin"] = sp["SP_ISIN"].astype(str).apply(normalize_key)
 
@@ -206,7 +206,7 @@ def merge_ur_into_sp_opt(sp_df, ur_df):
         # 🔹 This lets you enrich SPGlobal data with missing info from Urgewald — only when they match by ISIN, LEI, or name. 🔹
         if target is not None:
             for c, v in r.items():
-                if c.startswith("norm_"):    # 🔹 These columns like "norm_isin", "norm_lei" etc. were only used for matching — they are not real data. So we skip them. We don’t want to merge them into the final DataFrame. 🔹
+                if c.startswith("norm_"):    # 🔹 These columns like "norm_isin", "norm_lei" etc. were only used for matching — they are not real data. So we skip them. We don't want to merge them into the final DataFrame. 🔹
                     continue
                 if c not in sp or pd.isna(sp.at[target, c]) or str(sp.at[target, c]).strip() == "":  # 🔹 Filling other missing identifiers if found in urgewald 🔹
                     sp.at[target, c] = v
@@ -303,7 +303,7 @@ def compute_exclusion(row, **params):
                     f"SP level-2 combined {combo:.2f}% {op(params['sp_level2_ge'])} {params['sp_level2_threshold']}%"
                 )
 
-    # 🔹 This code block checks Urgewald revenue-based exclusion rules — and adds detailed reasons for exclusion based on the company’s sector type (mining, power, or mixed) and revenue percentage.🔹
+    # 🔹 This code block checks Urgewald revenue-based exclusion rules — and adds detailed reasons for exclusion based on the company's sector type (mining, power, or mixed) and revenue percentage.🔹
     if has_ur:
         if is_mining_only and params["ur_mining_checkbox"] and test(ur_rev_pct, params["ur_mining_threshold"], params["ur_mining_ge"]):
             reasons.append(
@@ -433,8 +433,12 @@ def main():
         expansion_exclude=[e.strip() for e in expansion_exclude if e.strip()]
     )
 
-    # 🔹The apply() function runs the filtering rules for each row in the dataset and adds the results as two new columns: Excluded (whether the row meets exclusion criteria) and Exclusion Reasons 🔹
+    # 🔹 FIX: Added .copy() to prevent SettingWithCopyWarning and ensure Excluded/Exclusion Reasons
+    #         columns are correctly written back to the DataFrame slices. Without .copy(), assignments
+    #         to df["Excluded"] and df["Exclusion Reasons"] silently fail on DataFrame slices,
+    #         causing all Urgewald-only (and other) rows to appear empty in the output. 🔹
     def apply(df):
+        df = df.copy()  # ← FIX: prevents silent write failures on DataFrame slices
         if df.empty:
             return df.assign(Excluded=False, **{"Exclusion Reasons": ""})
         res = df.apply(lambda r: compute_exclusion(r, **params), axis=1, result_type="expand")
@@ -461,12 +465,16 @@ def main():
         "BB Ticker", "ISIN equity", "LEI", "Excluded", "Exclusion Reasons"
     ]
     
-    # 🔹 This function prepares the final dataset for export by: Making sure all needed columns are present, Cleaning up ticker formatting, Returning columns in the right order🔹
+    # 🔹 FIX: Added .copy() to prevent SettingWithCopyWarning and ensure column assignments
+    #         (adding missing columns, cleaning BB Ticker) are correctly applied. Without .copy(),
+    #         modifications to DataFrame slices passed into this function are silently dropped,
+    #         which caused Urgewald-only rows to show blank or missing data in the Excel output. 🔹
     def finalize(d):
+        d = d.copy()  # ← FIX: prevents silent write failures on DataFrame slices
         for c in final_cols:
             if c not in d:
                 d[c] = ""
-    # strip the trailing “ Equity ” (and any whitespace before it) from BB tickers
+        # strip the trailing " Equity " (and any whitespace before it) from BB tickers
         if "BB Ticker" in d:
             d["BB Ticker"] = (
                 d["BB Ticker"]
@@ -505,6 +513,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-
-

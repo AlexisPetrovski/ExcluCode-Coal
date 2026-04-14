@@ -170,11 +170,11 @@ def load_urgewald(file, sheet_name=None):
         st.write("Urgewald columns after rename:", ur_df.columns.tolist())
 
         # ✅ FIX: ensure 'Company' column exists
-            if "Company" not in ur_df.columns:
-                for col in ur_df.columns:
-              if "company" in str(col).lower():
-                  ur_df.rename(columns={col: "Company"}, inplace=True)
-                    break
+        if "Company" not in ur_df.columns:
+            for col in ur_df.columns:
+        if "company" in str(col).lower():
+            ur_df.rename(columns={col: "Company"}, inplace=True)
+            break
 
             # 🚨 HARD FAIL if still missing
             if "Company" not in ur_df.columns:

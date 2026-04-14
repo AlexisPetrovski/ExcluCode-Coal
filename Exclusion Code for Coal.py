@@ -167,7 +167,7 @@ def load_urgewald(file, sheet_name=None):
         ur_df = fuzzy_rename_columns(ur_df, rename_map_ur).astype(object)
 
         # 🔍 DEBUG: check columns after renaming
-            st.write("Urgewald columns after rename:", ur_df.columns.tolist())
+        st.write("Urgewald columns after rename:", ur_df.columns.tolist())
 
         # ✅ FIX: ensure 'Company' column exists
             if "Company" not in ur_df.columns:

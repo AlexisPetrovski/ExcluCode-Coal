@@ -122,8 +122,8 @@ def load_urgewald(file, sheet_name=None):
         if sheet_name is None or sheet_name not in wb.sheetnames:
             for s in wb.sheetnames:
                 if "gcel" in s.lower():
-                sheet_name = s
-                break
+                    sheet_name = s
+                    break
 
         # 🚨 fallback if nothing found
         if sheet_name not in wb.sheetnames:

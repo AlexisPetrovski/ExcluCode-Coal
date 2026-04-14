@@ -255,15 +255,14 @@ def merge_ur_into_sp_opt(sp_df, ur_df):
         sp["Merged"] = False
     else:
         sp["Merged"] = sp["Merged"].fillna(False)
-   ur_only = pd.DataFrame(ur_not)
+        
+    ur_only = pd.DataFrame(ur_not)
 
-        # ✅ FIX: ensure Merged column always exists
-            if "Merged" not in ur_only.columns:
-                ur_only["Merged"] = False
-                    else:
-                ur_only["Merged"] = ur_only["Merged"].fillna(False)
-
-
+    # ✅ FIX: ensure Merged column always exists
+    if "Merged" not in ur_only.columns:
+        ur_only["Merged"] = False
+    else:
+        ur_only["Merged"] = ur_only["Merged"].fillna(False)
 
     for c in [c for c in sp.columns if c.startswith("norm_")]:
         sp.drop(columns=c, inplace=True, errors="ignore")    # 🔹  Removes any temporary norm_* columns (like norm_isin, norm_lei, norm_name) that were used for matching. 🔹

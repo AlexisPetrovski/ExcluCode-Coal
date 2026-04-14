@@ -463,11 +463,12 @@ def main():
         
     # 🔹 This code ensures that the Merged column is correctly set for both datasets after trying to match and merge the SPGlobal and Urgewald data. 🔹
     merged_sp, ur_only = merge_ur_into_sp_opt(sp_df, ur_df)
-        # 🔍 DEBUG: check merge results
-            st.write("SP rows:", len(sp_df))
-            st.write("UR rows:", len(ur_df))
-            st.write("Merged rows:", merged_sp["Merged"].sum())
-            st.write("UR only rows:", len(ur_only))
+    # 🔍 DEBUG: check merge results
+    st.write("SP rows:", len(sp_df))
+    st.write("UR rows:", len(ur_df))
+    st.write("Merged rows:", merged_sp["Merged"].sum())
+    st.write("UR only rows:", len(ur_only))
+    
     for d in (merged_sp, ur_only):
         d["Merged"] = d.get("Merged", False).fillna(False)
 

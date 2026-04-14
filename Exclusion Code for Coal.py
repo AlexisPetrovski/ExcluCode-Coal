@@ -147,7 +147,7 @@ def load_urgewald(file, sheet_name=None):
         ur_df = make_columns_unique(ur_df)
 
         # ✅ FIX: normalize column names early
-            ur_df.columns = [str(c).strip() for c in ur_df.columns]
+        ur_df.columns = [str(c).strip() for c in ur_df.columns]
        
         # 🔹 Standardized names for integrity🔹
         rename_map_ur = {

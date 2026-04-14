@@ -171,7 +171,7 @@ def load_urgewald(file, sheet_name=None):
 
         # ✅ FIX: ensure 'Company' column exists
         if "Company" not in ur_df.columns:
-            for col in ur_df.columns:
+        for col in ur_df.columns:
         if "company" in str(col).lower():
             ur_df.rename(columns={col: "Company"}, inplace=True)
             break

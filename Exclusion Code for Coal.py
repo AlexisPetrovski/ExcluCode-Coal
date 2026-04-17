@@ -24,7 +24,7 @@ def to_float(val):
         return 0.0
 
 
-# 🔹 Ensures that repeated column names like "Company", "Company" are renamed to "Company", "Company_1". If it's the first appearance of the column → use the name as-is ("Company"). If it's a duplicate → add a numeric suffix, like "Company_1", "Company_2" 🔹
+# 🔹 Ensures that repeated column names like “Company”, “Company” are renamed to “Company”, “Company_1”. If it's the first appearance of the column → use the name as-is ("Company"). If it's a duplicate → add a numeric suffix, like "Company_1", "Company_2" 🔹
 def make_columns_unique(df):
     seen, new_cols = {}, []
     for c in df.columns:
@@ -33,7 +33,7 @@ def make_columns_unique(df):
     df.columns = new_cols
     return df
 
-# 🔹 It renames columns in a table (a DataFrame) by looking for similar names, even if they're not exactly the same. 🔹
+# 🔹 It renames columns in a table (a DataFrame) by looking for similar names, even if they’re not exactly the same. 🔹
 def fuzzy_rename_columns(df, rename_map):
     used = set()
     for final_name, pats in rename_map.items():
@@ -51,11 +51,8 @@ def fuzzy_rename_columns(df, rename_map):
 
 # 🔹 Normatlization of string 🔹
 def normalize_key(s):
-    s = str(s).lower()
-    s = re.sub(r"[^\w\s]", "", s)
-    s = re.sub(r"\b(ltd|limited|sa|plc|inc|corp|co)\b", "", s)
-    s = re.sub(r"\s+", " ", s)
-    return s.strip()
+    return re.sub(r"[^\w\s]", "", re.sub(r"\s+", " ", s.lower())).strip()
+
 
 # 🔹 loaders and data preperation that headers would be in proper place and remove double rows 🔹
 def load_spglobal(file, sheet_name="Sheet1"):
@@ -114,48 +111,20 @@ def load_spglobal(file, sheet_name="Sheet1"):
         return pd.DataFrame()
 
 # 🔹 The load_urgewald function reads the Urgewald Excel file🔹
-def load_urgewald(file, sheet_name=None):
+def load_urgewald(file, sheet_name="GCEL 2025"):
     try:
         wb = openpyxl.load_workbook(file, data_only=True)
-
-        # ✅ FIX: auto-detect GCEL sheet if not provided
-        if sheet_name is None or sheet_name not in wb.sheetnames:
-            for s in wb.sheetnames:
-                if "gcel" in s.lower():
-                    sheet_name = s
-                    break
-
-        # 🚨 fallback if nothing found
-        if sheet_name not in wb.sheetnames:
-            st.error(f"❌ No GCEL sheet found. Available sheets: {wb.sheetnames}")
-            return pd.DataFrame()
-
         ws = wb[sheet_name]
-
-        # 🔍 DEBUG
-        st.write(f"Using Urgewald sheet: {sheet_name}")
-
         data = list(ws.values)
         full_df = pd.DataFrame(data)
         if full_df.empty:
             raise ValueError("Urgewald file is empty.")
-# 🔹 Removes any "Parent Company" columns, cleans up the headers, fixes duplicate column names, and converts key numbers (like revenue %) into proper numeric values. It prepares the data so it's ready to be used in filtering or analysis.🔹
-        HEADER_ROW = 3  # <- this is the real header row in your file
-
-        header = full_df.iloc[HEADER_ROW].fillna("").astype(str)
-
-        mask = header.str.strip().str.lower() != "parent company"
-
-        ur_df = full_df.iloc[HEADER_ROW + 1:].reset_index(drop=True)
-        ur_df = ur_df.loc[:, mask]
-
-        ur_df.columns = header[mask].tolist()
+# 🔹 Removes any "Parent Company" columns, cleans up the headers, fixes duplicate column names, and converts key numbers (like revenue %) into proper numeric values. It prepares the data so it’s ready to be used in filtering or analysis.🔹
+        header = full_df.iloc[0].fillna("")
+        keep = header.str.strip().str.lower() != "parent company"
         ur_df = full_df.iloc[1:].reset_index(drop=True).loc[:, keep]
         ur_df.columns = [c for c in header if str(c).strip().lower() != "parent company"]
         ur_df = make_columns_unique(ur_df)
-
-        # ✅ FIX: normalize column names early
-        ur_df.columns = [str(c).strip() for c in ur_df.columns]
        
         # 🔹 Standardized names for integrity🔹
         rename_map_ur = {
@@ -173,20 +142,6 @@ def load_urgewald(file, sheet_name=None):
             "Thermal Coal Mining": ["thermal coal mining"],
         }
         ur_df = fuzzy_rename_columns(ur_df, rename_map_ur).astype(object)
-
-        # 🔍 DEBUG: check columns after renaming
-        st.write("Urgewald columns after rename:", ur_df.columns.tolist())
-
-        # ✅ FIX: ensure 'Company' column exists
-        if "Company" not in ur_df.columns:
-            for col in ur_df.columns:
-                if "company" in str(col).lower():
-                    ur_df.rename(columns={col: "Company"}, inplace=True)
-                    break
-
-            # 🚨 HARD FAIL if still missing
-            if "Company" not in ur_df.columns:
-                st.error("❌ 'Company' column not detected in Urgewald file")
 
         # 🔹 This is a list of key numeric columns in the file that need to be properly converted to float numbers (like percentages or MW values). 🔹
         for col in [
@@ -209,20 +164,9 @@ def merge_ur_into_sp_opt(sp_df, ur_df):
     ur = ur_df.copy().astype(object)
 
     # 🔹 Creating normalized versions of key identity columns from the SPGlobal dataset 🔹
-    if "SP_ISIN" not in sp.columns:
-        sp["SP_ISIN"] = ""   # create an empty column if it doesn't exist
-        
-    sp["norm_isin"] = sp["SP_ISIN"].astype(str).apply(normalize_key)
-
-    if "SP_LEI" not in sp.columns:
-        sp["SP_LEI"] = ""
-    
-    sp["norm_lei"] = sp["SP_LEI"].astype(str).apply(normalize_key)
-
-    if "SP_ENTITY_NAME" not in sp.columns:
-        sp["SP_ENTITY_NAME"] = ""
-    
-    sp["norm_name"] = sp["SP_ENTITY_NAME"].astype(str).apply(normalize_key)
+    sp["norm_isin"] = sp.get("SP_ISIN", "").astype(str).apply(normalize_key)
+    sp["norm_lei"] = sp.get("SP_LEI", "").astype(str).apply(normalize_key)
+    sp["norm_name"] = sp.get("SP_ENTITY_NAME", "").astype(str).apply(normalize_key)
 
     # 🔹 Creating normalized versions of key identity columns from the Urgewald dataset and searches for identities in the raw 🔹
     for col in ["ISIN equity", "LEI", "Company"]:
@@ -251,7 +195,7 @@ def merge_ur_into_sp_opt(sp_df, ur_df):
         # 🔹 This lets you enrich SPGlobal data with missing info from Urgewald — only when they match by ISIN, LEI, or name. 🔹
         if target is not None:
             for c, v in r.items():
-                if c.startswith("norm_"):    # 🔹 These columns like "norm_isin", "norm_lei" etc. were only used for matching — they are not real data. So we skip them. We don't want to merge them into the final DataFrame. 🔹
+                if c.startswith("norm_"):    # 🔹 These columns like "norm_isin", "norm_lei" etc. were only used for matching — they are not real data. So we skip them. We don’t want to merge them into the final DataFrame. 🔹
                     continue
                 if c not in sp or pd.isna(sp.at[target, c]) or str(sp.at[target, c]).strip() == "":  # 🔹 Filling other missing identifiers if found in urgewald 🔹
                     sp.at[target, c] = v
@@ -259,18 +203,9 @@ def merge_ur_into_sp_opt(sp_df, ur_df):
         else:
             ur_not.append(r)
     # 🔹 This code finalizes the merge by clearly marking which rows were merged and which were not.🔹 
-    if "Merged" not in sp.columns:
-        sp["Merged"] = False
-    else:
-        sp["Merged"] = sp["Merged"].fillna(False)
-        
+    sp["Merged"] = sp.get("Merged", False).fillna(False) # 🔹 Ensures that the "Merged" column exists in sp and has only True or False values. 🔹
     ur_only = pd.DataFrame(ur_not)
-
-    # ✅ FIX: ensure Merged column always exists
-    if "Merged" not in ur_only.columns:
-        ur_only["Merged"] = False
-    else:
-        ur_only["Merged"] = ur_only["Merged"].fillna(False)
+    ur_only["Merged"] = False
 
     for c in [c for c in sp.columns if c.startswith("norm_")]:
         sp.drop(columns=c, inplace=True, errors="ignore")    # 🔹  Removes any temporary norm_* columns (like norm_isin, norm_lei, norm_name) that were used for matching. 🔹
@@ -307,14 +242,7 @@ def compute_exclusion(row, **params):
     expansion = str(row.get("expansion", "")).lower()
 
     has_sp = bool(str(row.get("SP_ENTITY_NAME", "")).strip())
-    # ✅ FIX: more robust Urgewald detection
-    has_ur = any([
-        str(row.get("Company", "")).strip(),
-        str(row.get("ISIN equity", "")).strip(),
-        str(row.get("LEI", "")).strip()
-        ])
-
-
+    has_ur = bool(str(row.get("Company", "")).strip())
 
     # 🔹 sectors 🔹
     sector_raw = str(row.get("Coal Industry Sector", "")).lower()
@@ -329,10 +257,6 @@ def compute_exclusion(row, **params):
     is_mining_only = bool(mining_parts) and not power_parts and not other_parts
     is_power_only = bool(power_parts) and not mining_parts and not other_parts
     is_mixed = bool(mining_parts) and bool(power_parts) and not other_parts
-
-    # ✅ FIX: fallback if sector parsing fails
-    if has_ur and not (is_mining_only or is_power_only or is_mixed):
-        is_mixed = True
 
     # 🔹 This code block adds exclusion reasons based on general (non-revenue) filters if certain conditions are met. 🔹
     if params["exclude_mt"] and "10mt" in prod_str:
@@ -365,7 +289,7 @@ def compute_exclusion(row, **params):
                     f"SP level-2 combined {combo:.2f}% {op(params['sp_level2_ge'])} {params['sp_level2_threshold']}%"
                 )
 
-    # 🔹 This code block checks Urgewald revenue-based exclusion rules — and adds detailed reasons for exclusion based on the company's sector type (mining, power, or mixed) and revenue percentage.🔹
+    # 🔹 This code block checks Urgewald revenue-based exclusion rules — and adds detailed reasons for exclusion based on the company’s sector type (mining, power, or mixed) and revenue percentage.🔹
     if has_ur:
         if is_mining_only and params["ur_mining_checkbox"] and test(ur_rev_pct, params["ur_mining_threshold"], params["ur_mining_ge"]):
             reasons.append(
@@ -401,7 +325,7 @@ def main():
     # 🔹 file inputs 🔹
     st.sidebar.header("File & Sheet Settings")
     sp_sheet = st.sidebar.text_input("SPGlobal Sheet Name", "Sheet1")
-    ur_sheet = st.sidebar.text_input("Urgewald Sheet Name (optional)", "")
+    ur_sheet = st.sidebar.text_input("Urgewald Sheet Name", "GCEL 2025")
     sp_file = st.sidebar.file_uploader("Upload SPGlobal Excel file", type=["xlsx"])
     ur_file = st.sidebar.file_uploader("Upload Urgewald Excel file", type=["xlsx"])
     st.sidebar.markdown("---")
@@ -464,19 +388,13 @@ def main():
         st.warning("Please upload both files")
         st.stop()
     sp_df = load_spglobal(sp_file, sp_sheet)
-    ur_df = load_urgewald(ur_file, ur_sheet if ur_sheet.strip() else None)
+    ur_df = load_urgewald(ur_file, ur_sheet)
     if sp_df.empty or ur_df.empty:
         st.warning("Error loading data")
         st.stop()
         
     # 🔹 This code ensures that the Merged column is correctly set for both datasets after trying to match and merge the SPGlobal and Urgewald data. 🔹
     merged_sp, ur_only = merge_ur_into_sp_opt(sp_df, ur_df)
-    # 🔍 DEBUG: check merge results
-    st.write("SP rows:", len(sp_df))
-    st.write("UR rows:", len(ur_df))
-    st.write("Merged rows:", merged_sp["Merged"].sum())
-    st.write("UR only rows:", len(ur_only))
-    
     for d in (merged_sp, ur_only):
         d["Merged"] = d.get("Merged", False).fillna(False)
 
@@ -501,12 +419,8 @@ def main():
         expansion_exclude=[e.strip() for e in expansion_exclude if e.strip()]
     )
 
-    # 🔹 FIX: Added .copy() to prevent SettingWithCopyWarning and ensure Excluded/Exclusion Reasons
-    #         columns are correctly written back to the DataFrame slices. Without .copy(), assignments
-    #         to df["Excluded"] and df["Exclusion Reasons"] silently fail on DataFrame slices,
-    #         causing all Urgewald-only (and other) rows to appear empty in the output. 🔹
+    # 🔹The apply() function runs the filtering rules for each row in the dataset and adds the results as two new columns: Excluded (whether the row meets exclusion criteria) and Exclusion Reasons 🔹
     def apply(df):
-        df = df.copy()  # ← FIX: prevents silent write failures on DataFrame slices
         if df.empty:
             return df.assign(Excluded=False, **{"Exclusion Reasons": ""})
         res = df.apply(lambda r: compute_exclusion(r, **params), axis=1, result_type="expand")
@@ -533,16 +447,12 @@ def main():
         "BB Ticker", "ISIN equity", "LEI", "Excluded", "Exclusion Reasons"
     ]
     
-    # 🔹 FIX: Added .copy() to prevent SettingWithCopyWarning and ensure column assignments
-    #         (adding missing columns, cleaning BB Ticker) are correctly applied. Without .copy(),
-    #         modifications to DataFrame slices passed into this function are silently dropped,
-    #         which caused Urgewald-only rows to show blank or missing data in the Excel output. 🔹
+    # 🔹 This function prepares the final dataset for export by: Making sure all needed columns are present, Cleaning up ticker formatting, Returning columns in the right order🔹
     def finalize(d):
-        d = d.copy()  # ← FIX: prevents silent write failures on DataFrame slices
         for c in final_cols:
             if c not in d:
                 d[c] = ""
-        # strip the trailing " Equity " (and any whitespace before it) from BB tickers
+    # strip the trailing “ Equity ” (and any whitespace before it) from BB tickers
         if "BB Ticker" in d:
             d["BB Ticker"] = (
                 d["BB Ticker"]

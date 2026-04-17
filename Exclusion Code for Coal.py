@@ -140,8 +140,11 @@ def load_urgewald(file, sheet_name=None):
         if full_df.empty:
             raise ValueError("Urgewald file is empty.")
 # 🔹 Removes any "Parent Company" columns, cleans up the headers, fixes duplicate column names, and converts key numbers (like revenue %) into proper numeric values. It prepares the data so it's ready to be used in filtering or analysis.🔹
-        header = full_df.iloc[0].fillna("")
-        keep = header.str.strip().str.lower() != "parent company"
+        HEADER_ROW = 3  # <- this is the real header row in your file
+
+        header = full_df.iloc[HEADER_ROW].fillna("")
+        ur_df = full_df.iloc[HEADER_ROW + 1:].reset_index(drop=True)
+        ur_df.columns = header
         ur_df = full_df.iloc[1:].reset_index(drop=True).loc[:, keep]
         ur_df.columns = [c for c in header if str(c).strip().lower() != "parent company"]
         ur_df = make_columns_unique(ur_df)
